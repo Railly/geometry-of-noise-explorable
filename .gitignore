@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+__marimo__/
+*.backup
+*.backup2
+*.swiss.backup
+smoketest*.py
+swarm-decide.ts
+swarm-output/
+*.pdf
+.DS_Store
