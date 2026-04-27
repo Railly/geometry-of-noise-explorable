@@ -7,7 +7,7 @@ Diffusion is sold as robust sampling. On a 2D swiss roll, that depends on coordi
 
 In my marimo notebook: at K=100, dt=0.04, FM lands 100% within ε=0.15 of the manifold. DDPM lands 0%.
 
-Try the WASM molab: https://molab.marimo.io/notebooks/nb_B3Ns3kjFJaT5ayKniGdJgx
+Try the WASM molab: https://molab.marimo.io/notebooks/nb_RBaLdF27xB6V5D84XkWYz4
 ```
 
 ## Tweet 2/8
@@ -67,7 +67,7 @@ This is my submission to the @alphaXiv x @marimo_io notebook competition: a repr
 If you want to test the claim, run the notebook. Change K, dt, ε, or the manifold tolerance and watch the stability map move.
 
 Repo: github.com/Railly/geometry-of-noise-explorable
-Molab: https://molab.marimo.io/notebooks/nb_B3Ns3kjFJaT5ayKniGdJgx
+Molab: https://molab.marimo.io/notebooks/nb_RBaLdF27xB6V5D84XkWYz4
 
 Built by Hunter (@raillyhugo), AI engineer at Clerk.
 ```

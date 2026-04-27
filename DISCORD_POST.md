@@ -1,4 +1,4 @@
-https://molab.marimo.io/notebooks/nb_B3Ns3kjFJaT5ayKniGdJgx
+https://molab.marimo.io/notebooks/nb_RBaLdF27xB6V5D84XkWYz4
 
 Hi #molab-competition, my submission: a companion to *The Geometry of Noise: Why Diffusion Models Don't Need Noise Conditioning* (Sahraee-Ardakan, Delbracio, Milanfar 2026, arXiv:2602.18428).
 

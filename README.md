@@ -25,7 +25,7 @@ Interactive marimo notebook for stress-testing diffusion parametrizations on a 2
 
 ## Quick Try
 
-[**Open the notebook in molab**](https://molab.marimo.io/notebooks/nb_B3Ns3kjFJaT5ayKniGdJgx). Runs in your browser via WASM. No install required. Click "Train all four parametrizations", then drag the sliders.
+[**Open the notebook in molab**](https://molab.marimo.io/notebooks/nb_RBaLdF27xB6V5D84XkWYz4). Runs in your browser via WASM. No install required. Click "Train all four parametrizations", then drag the sliders.
 
 ## The Kill-Shot
 
