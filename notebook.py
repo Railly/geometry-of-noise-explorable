@@ -576,5 +576,113 @@ def _section_8(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _section_9(mo):
+    mo.md(
+        r"""
+        ## 9. Gallery
+        """
+    )
+    return
+
+
+@app.cell
+def _gallery_datasets(np):
+    def _standardize(_pts):
+        _pts = _pts - _pts.mean(axis=0, keepdims=True)
+        _scale = np.sqrt((_pts ** 2).sum(axis=1)).max()
+        return _pts / (_scale + 1e-9) * 1.6
+
+    def _make_swiss_roll(_g, _n, _jitter):
+        _t = 1.5 * np.pi * (1 + 2 * _g.random(_n))
+        _pts = np.stack([_t * np.cos(_t), _t * np.sin(_t)], axis=1) / 12.0
+        _pts += _jitter * _g.standard_normal(_pts.shape)
+        return _standardize(_pts)
+
+    def _make_two_moons(_g, _n, _jitter):
+        _n0 = _n // 2
+        _n1 = _n - _n0
+        _t0 = np.pi * _g.random(_n0)
+        _t1 = np.pi * _g.random(_n1)
+        _moon0 = np.stack([np.cos(_t0), np.sin(_t0)], axis=1)
+        _moon1 = np.stack([1.0 - np.cos(_t1), 0.5 - np.sin(_t1)], axis=1)
+        _pts = np.vstack([_moon0, _moon1])
+        _pts += _jitter * _g.standard_normal(_pts.shape)
+        return _standardize(_pts)
+
+    def _make_gaussian_mixture(_g, _n, _jitter):
+        _centers = np.array([[-1.2, -0.6], [1.0, -0.4], [0.1, 1.1]])
+        _idx = _g.integers(0, len(_centers), size=_n)
+        _pts = _centers[_idx] + (0.12 + _jitter) * _g.standard_normal((_n, 2))
+        return _standardize(_pts)
+
+    def _make_circles(_g, _n, _jitter):
+        _n0 = _n // 2
+        _n1 = _n - _n0
+        _t0 = 2 * np.pi * _g.random(_n0)
+        _t1 = 2 * np.pi * _g.random(_n1)
+        _outer = np.stack([np.cos(_t0), np.sin(_t0)], axis=1)
+        _inner = 0.45 * np.stack([np.cos(_t1), np.sin(_t1)], axis=1)
+        _pts = np.vstack([_outer, _inner])
+        _pts += _jitter * _g.standard_normal(_pts.shape)
+        return _standardize(_pts)
+
+    _g = np.random.default_rng(2602)
+    gallery_datasets = {
+        "swiss_roll": _make_swiss_roll(_g, 1200, 0.04),
+        "two_moons": _make_two_moons(_g, 1200, 0.04),
+        "gaussian_mixture": _make_gaussian_mixture(_g, 1200, 0.03),
+        "circles": _make_circles(_g, 1200, 0.03),
+    }
+    return (gallery_datasets,)
+
+
+@app.cell(hide_code=True)
+def _gallery(PARAMETRIZATIONS, forward, gallery_datasets, np, plt, step_dir, train_one):
+    _K = 100
+    _dt = 0.04
+    _n = 300
+    _steps = 1400
+    _seed_base = 2602
+    _fig, _axes = plt.subplots(len(gallery_datasets), len(PARAMETRIZATIONS), figsize=(14, 13))
+
+    for _row, (_dataset_name, _X_gallery) in enumerate(gallery_datasets.items()):
+        _models_gallery = {}
+        for _col, _name in enumerate(PARAMETRIZATIONS):
+            _seed = _seed_base + _row * 101 + _col * 17
+            _models_gallery[_name], _ = train_one(_name, _X_gallery, steps=_steps, seed=_seed)
+            _g = np.random.default_rng(_seed + 9000)
+            _u = _g.standard_normal((_n, 2))
+            _traj = [_u.copy()]
+            for _ in range(_K):
+                _pred, _ = forward(_models_gallery[_name], _u)
+                _u = _u + _dt * step_dir(_name, _pred, _u)
+                _u = np.clip(_u, -10, 10)
+                _traj.append(_u.copy())
+            _traj = np.array(_traj)
+            _d_to_data = np.sqrt(((_traj[-1][:, None, :] - _X_gallery[None, :, :]) ** 2).sum(-1)).min(1)
+            _pct = (_d_to_data < 0.15).mean() * 100
+            _ax = _axes[_row, _col]
+            _ax.scatter(_X_gallery[:, 0], _X_gallery[:, 1], s=2, alpha=0.22, c="#0a84ff")
+            _idx = _g.integers(0, _n, size=35)
+            for _i in _idx:
+                _ax.plot(_traj[:, _i, 0], _traj[:, _i, 1], lw=0.35, alpha=0.35, c="grey")
+            _ax.scatter(_traj[-1, :, 0], _traj[-1, :, 1], s=7, alpha=0.62, c="#ff3b30")
+            _ax.set_aspect("equal")
+            _ax.set_xlim(-3, 3)
+            _ax.set_ylim(-3, 3)
+            _ax.set_xticks([])
+            _ax.set_yticks([])
+            _ax.grid(alpha=0.12)
+            _ax.set_title(f"{_name} · {_pct:.0f}%")
+            if _col == 0:
+                _ax.set_ylabel(_dataset_name, rotation=0, ha="right", va="center", labelpad=42)
+
+    _fig.suptitle("Gallery: same kill-shot across 4 manifolds", fontsize=18, y=0.985)
+    _fig.text(0.5, 0.958, "FM holds across geometries; DDPM fails everywhere.", ha="center", fontsize=12)
+    _fig.tight_layout(rect=[0, 0, 1, 0.94])
+    _fig
+
+
 if __name__ == "__main__":
     app.run()
