@@ -2,6 +2,7 @@ import pathlib
 
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
 PARAMETRIZATIONS = ["DDPM", "EDM", "FM", "EqM"]
@@ -113,7 +114,7 @@ def step_dir(name, pred, u):
     raise ValueError(name)
 
 
-def sample_run(name, model, X, n=300, K=100, dt=0.04, seed=42):
+def sample_run(name, model, X, n=400, K=100, dt=0.04, seed=42):
     g = np.random.default_rng(seed)
     u = g.standard_normal((n, 2)) * 1.0
     traj_idx = g.choice(n, size=30, replace=False)
@@ -124,7 +125,7 @@ def sample_run(name, model, X, n=300, K=100, dt=0.04, seed=42):
         u = np.clip(u, -10, 10)
         traj.append(u[traj_idx].copy())
     d_to_data = np.sqrt(((u[:, None, :] - X[None, :, :]) ** 2).sum(-1)).min(1)
-    return u, np.array(traj), (d_to_data < 0.15).mean() * 100
+    return u, np.array(traj), d_to_data
 
 
 def main():
@@ -137,24 +138,45 @@ def main():
     for name in PARAMETRIZATIONS:
         models[name] = train_one(name, X, steps=2500, seed=seeds[name])
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 7), dpi=100)
+    fig, axes = plt.subplots(2, 2, figsize=(14, 7), dpi=120)
     for ax, name in zip(axes.ravel(), PARAMETRIZATIONS):
-        u, traj, pct = sample_run(name, models[name], X)
-        print(f"{name}: {pct:.0f}%")
-        ax.scatter(X[:, 0], X[:, 1], s=3, alpha=0.25, c="#0a84ff")
+        u, traj, distances = sample_run(name, models[name], X, n=400, K=100, dt=0.04, seed=42)
+        converged = distances < 0.15
+        close = (distances >= 0.15) & (distances < 0.5)
+        failed = distances >= 0.5
+        converged_pct = converged.mean() * 100
+        failed_pct = failed.mean() * 100
+        print(f"{name}: {converged_pct:.0f}% within epsilon, {failed_pct:.0f}% diverged")
+        ax.scatter(X[:, 0], X[:, 1], s=3, alpha=0.3, c="#0a84ff")
         for i in range(traj.shape[1]):
-            ax.plot(traj[:, i, 0], traj[:, i, 1], lw=0.45, alpha=0.35, c="grey")
-        ax.scatter(u[:, 0], u[:, 1], s=9, c="#ff3b30", alpha=0.7)
+            ax.plot(traj[:, i, 0], traj[:, i, 1], lw=0.45, alpha=0.15, c="lightgrey")
+        ax.scatter(u[failed, 0], u[failed, 1], s=10, c="#333333", alpha=0.8)
+        ax.scatter(u[close, 0], u[close, 1], s=10, c="#ff9500", alpha=0.85)
+        ax.scatter(u[converged, 0], u[converged, 1], s=10, c="#ff3b30", alpha=0.9)
+        inset = inset_axes(ax, width="25%", height="25%", loc="upper right", borderpad=0.8)
+        inset.hist(distances, bins=24, range=(0, 1.5), color="#555555", alpha=0.85)
+        inset.axvline(0.15, color="#ff3b30", lw=1.0)
+        inset.axvline(0.5, color="#ff9500", lw=1.0)
+        inset.set_xlim(0, 1.5)
+        inset.set_xticks([0, 0.5, 1.5])
+        inset.set_yticks([])
+        inset.tick_params(labelsize=6, length=2, pad=1)
+        inset.set_facecolor("white")
+        for spine in inset.spines.values():
+            spine.set_alpha(0.35)
         ax.set_aspect("equal")
         ax.set_xlim(-3, 3)
         ax.set_ylim(-3, 3)
-        ax.set_title(f"{name} — {pct:.0f}% conv")
+        ax.set_title(f"{name} — {converged_pct:.0f}% within ε / {failed_pct:.0f}% diverged")
         ax.grid(alpha=0.15)
 
-    fig.suptitle("Same K, same dt, only the parametrization differs")
-    fig.tight_layout()
-    fig.savefig(root / "assets" / "killer-figure.png", bbox_inches="tight")
-    print(root / "assets" / "killer-figure.png")
+    fig.suptitle(
+        "Autonomous sampling on swiss roll — same K, same dt, only the parametrization differs"
+    )
+    fig.subplots_adjust(top=0.9, hspace=0.24, wspace=0.15)
+    out = root / "assets" / "killer-figure-v2.png"
+    fig.savefig(out, bbox_inches="tight", dpi=120)
+    print(out)
 
 
 if __name__ == "__main__":

@@ -27,15 +27,16 @@ def _intro(mo):
     mo.md(
         r"""
         # The Geometry of Noise
-        ## Why diffusion models don't need noise conditioning — and why some of them break when you remove it
+
+        ## What if a diffusion model forgets the noise level and gets better at seeing the geometry?
 
         > An explorable companion to **Sahraee-Ardakan, Delbracio, Milanfar (2026)**, *"The Geometry of Noise: Why Diffusion Models Don't Need Noise Conditioning"* — [arXiv:2602.18428](https://arxiv.org/abs/2602.18428).
 
-        Standard diffusion models read both the noisy sample $\mathbf{u}$ **and** the noise level $t$. The paper asks: what happens if you remove $t$? The model has to integrate over its own posterior $p(t \mid \mathbf{u})$ — and the resulting field is a Riemannian gradient flow on a marginal energy that has a singularity right where you want it to converge. Why doesn't it explode?
+        Standard diffusion conditioning says: tell the network where it is in noise-time, then ask for the denoising direction. Remove that scalar, and the problem looks underdetermined. The same noisy point could have arrived from many noise levels, so the model should be confused. Yet the paper's first surprise is that the network does not merely average nonsense; it integrates over its own posterior belief about time.
 
-        **The answer is geometric**, not statistical. The learned field implicitly carries a *conformal metric* that cancels the singularity — but only for some parametrizations. Velocity-based ones (FM, EqM) are stable; noise-prediction (DDPM) is a high-gain amplifier of estimation error.
+        That averaging changes the object being followed. Instead of a time-indexed score field, the dynamics become a gradient flow on the marginal energy of noisy observations. Near the data manifold, that energy forms a sharp normal well: steep across the manifold, gentle along it. The singularity is real, but the learned field also carries a metric. In the right parametrization, the metric cancels the blow-up.
 
-        This notebook lets you **see** that difference, on data simple enough that every tensor fits on screen.
+        This notebook is the small mechanical version of that story. We train the four parametrizations from scratch on a 2D swiss roll and then push them with deliberately coarse steps. Velocity-style fields behave like geometry-aware flows; noise prediction behaves like a high-gain circuit attached to a shaky estimator. At $K{=}100$, $dt{=}0.04$, the gap is total: **FM converges $100\%$ within $\varepsilon$ of the manifold; DDPM converges $0\%$**. The toy experiment makes that gap hard to unsee.
 
         Drag the sliders. Everything runs locally in your browser. No data leaves your machine.
         """
@@ -326,22 +327,28 @@ def _section_6(mo):
         r"""
         ## 6. The kill-shot — sampling
 
-        Same starting points (Gaussian), same integration rule for all four. Only the *parametrization* differs.
+        Same data. Same network. Same sampler. Different parametrization. Watch what happens.
 
-        The paper's stability theorem (§5) predicts:
-        - **FM, EqM, EDM** — bounded-gain, wide stable basin
-        - **DDPM** — high-gain amplifier of estimation error, narrow basin
+        We start from the same Gaussian cloud and ask each trained model to transport it back to the swiss roll. For each run, we integrate exactly $K$ steps with the same autonomous step rule and the same step size $dt$.
 
-        **Try this**: set `dt = 0.04`, `K = 100`. Cycle through the dropdown. We measure (defaults):
+        | Parametrization | Converged at $K{=}100$, $dt{=}0.04$ |
+        |---|---:|
+        | **FM** | **100%** |
+        | EDM | 75% |
+        | EqM | 61% |
+        | **DDPM** | **0%** |
 
-        | parametrization | converged | diverged |
-        |---|---|---|
-        | DDPM | ~0% | high |
-        | FM | ~98% | 0% |
-        | EDM | ~70% | 0% |
-        | EqM | ~71% | 0% |
+        This is the kill shot. The architecture did not change. The data did not change. The sampler did not get special treatment. Only the parametrization changed, and the outcome went from perfect convergence to total failure.
 
-        Drop $dt$ to `0.005` and DDPM recovers — there's a stable basin, but it's narrow.
+        The reason is exactly the one predicted by the geometry. Velocity-based parametrizations behave like bounded-gain systems: posterior uncertainty is absorbed into a smooth drift field, so local errors stay local. DDPM, as noise prediction, is a high-gain amplifier: small score errors are multiplied by the inverse noise scale, and near the manifold that gain explodes.
+
+        **Use the sliders below to make the failure visible:**
+
+        1. Drop $dt$ to `0.005`. DDPM recovers — but only because the sampler is forced to crawl through the high-gain region.
+        2. Keep $dt{=}0.04$ and increase $K$. The velocity models remain stable; DDPM still pays for every inaccurate step near the manifold.
+        3. Push $dt$ upward. FM degrades gracefully, EDM and EqM break later, DDPM collapses first.
+
+        The point is not that DDPM cannot sample this distribution. It can. The point is that it needs far more numerical care for the same learned task — because its parametrization turns harmless estimation error into unstable geometry.
         """
     )
     return
@@ -541,21 +548,29 @@ def _falsify(PARAMETRIZATIONS, X, falsify_btn, forward, mo, models, np, plt, rng
 def _section_8(mo):
     mo.md(
         r"""
-        ## 8. What you just learned
+        ## 8. Limits and next steps
 
-        - All four models trained on the same 2D data, same MLP, same MSE loss. **Different targets** $(c, d)$ from Table 1.
-        - **The autonomous fields look completely different** (§4) — each parametrization shapes a different implicit Riemannian metric on the marginal energy.
-        - **Sampling exposes the stability gap** (§6, §7). FM/EDM/EqM converge across a wide $(K, dt)$ range. DDPM has a narrow stable basin and diverges easily — exactly what the paper's bounded-gain theorem predicts.
-        - The "noise conditioning is unnecessary" headline holds — *if* you pick the right parametrization. The paper's contribution is telling you which ones, and *why*.
+        This notebook proves a small, concrete thing: on a 2D swiss roll, with four numpy parametrizations trained from scratch, bounded-vector-field methods are much less fragile than high-gain noise-prediction parametrizations under the same sampling stress. In this sandbox the instability is not aesthetic or anecdotal — you can see trajectories blow up, samples leave the data manifold, and the falsification panel change as $(K, dt)$ moves.
 
-        ### Try
-        - Increase manifold thickness (jitter) in §2 — the singularity weakens. Does DDPM stabilize?
-        - In §7, find a $(K, dt)$ where FM converges and DDPM doesn't.
+        It does **not** prove the full image-domain claim of *The Geometry of Noise*. It does not cover convolutional architectures, large datasets, learned variance schedules, guidance, text conditioning, or the engineering choices that make modern diffusion systems work. A 2D swiss roll is not ImageNet. The point here is narrower: reproduce the mechanism in a setting where nothing important can hide behind scale.
+
+        That is also why the demo is 2D. The smallness is a feature, not a bug. Bret Victor's lesson for interactive media is that understanding changes when the variables are touchable. Here, every tensor fits on screen. You can inspect the field, move the sampler, change the gain, and watch failure appear instead of receiving it as a theorem or a benchmark number.
+
+        If you want to push further: replace `swiss_roll` with `sklearn.datasets.load_digits`, raise the hidden width to `256`, and stop pretending the Euler sampler is enough. At that point you will need a proper $\hat{\mathbf{x}}$-recovery sampler — the relevant starting point is paper §5.2.
+
+        ### What this notebook adds beyond the paper
+
+        The falsification panel is the part I wish every theory paper had as a companion. Sahraee-Ardakan, Delbracio, and Milanfar prove a gap. This notebook **maps** the gap empirically: not just whether one parametrization wins, but where it wins, where it fails, and how sharp the boundary is.
 
         ### Companion to
-        Sahraee-Ardakan, M., Delbracio, M., Milanfar, P. (2026). *The Geometry of Noise: Why Diffusion Models Don't Need Noise Conditioning*. arXiv:2602.18428.
 
-        Submitted to the **alphaXiv × marimo notebook competition**, April 2026.
+        Credit to **Mojtaba Sahraee-Ardakan, Mauricio Delbracio, and Peyman Milanfar** at Google for the paper and the clean problem framing — *The Geometry of Noise: Why Diffusion Models Don't Need Noise Conditioning*, [arXiv:2602.18428](https://arxiv.org/abs/2602.18428).
+
+        Gratitude to the **alphaXiv × marimo competition** for creating a reason to turn the argument into something inspectable.
+
+        ---
+
+        If you find a $(K, dt)$ where DDPM beats FM, I want to see it.
         """
     )
     return
